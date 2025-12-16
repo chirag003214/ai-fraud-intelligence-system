@@ -26,7 +26,7 @@ model = None
 def load_model():
     global model
     try:
-        model = mlflow.pyfunc.load_model(f"models:/{MODEL_NAME}/latest")
+        model = mlflow.pyfunc.load_model("fraud_model")
         print(f"✅ Model '{MODEL_NAME}' loaded successfully.")
     except Exception as e:
         print(f"❌ Error loading model: {e}")
