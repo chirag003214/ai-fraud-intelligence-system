@@ -1,0 +1,10 @@
+# Ignore the virtual environment (too heavy)
+venv/
+__pycache__/
+
+# Ignore the Dataset (too large for GitHub)
+data/
+*.csv
+
+# Ignore Secrets (Protects your API Key)
+.env
