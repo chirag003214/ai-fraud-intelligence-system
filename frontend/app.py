@@ -5,7 +5,8 @@ import os
 from datetime import datetime
 
 # --- CONFIG ---
-API_URL = "http://127.0.0.1:8000/predict"
+# Force the app to use the live cloud backend
+API_URL = "https://ai-fraud-intelligence-system.onrender.com/predict"
 st.set_page_config(page_title="FraudGuard", page_icon="🛡️", layout="wide")
 
 st.title("🛡️ Sentinel: AI Fraud Intelligence Platform")
