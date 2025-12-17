@@ -57,8 +57,27 @@ if analyze_btn:
         "oldbalanceOrg": old_bal,
         "newbalanceOrig": new_bal
     }
+    # ... inside the "Analyze Risk" button logic ...
+
+if st.button("Analyze Risk", type="primary"):
+    # ... (dataframe creation logic) ...
+    
+    # 👇 GET KEY FROM SECRETS (Or use default for local)
+    # On Streamlit Cloud, you will add this to Secrets.
+    API_KEY = os.getenv("API_KEY", "my_secret_password_123")
+    
+    headers = {
+        "Content-Type": "application/json",
+        "x-api-key": API_KEY # 👈 PASS THE KEY IN THE HEADER
+    }
     
     try:
+        # Pass 'headers=headers' in the request
+        response = requests.post(API_URL, json=txn_data, headers=headers) 
+        
+        # ... (rest of response handling) ...
+    
+    
         with st.spinner("Scanning transaction patterns..."):
             response = requests.post(API_URL, json=payload)
             
@@ -101,3 +120,6 @@ if analyze_btn:
             
     except Exception as e:
         st.error(f"Connection Error: {e}. Is the Backend running?")
+
+
+

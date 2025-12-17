@@ -1,6 +1,8 @@
 import pandas as pd
 import mlflow.pyfunc
 from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Security, Depends # 👈 Added Security imports
+from fastapi.security.api_key import APIKeyHeader # 👈 Added APIKeyHeader
 from pydantic import BaseModel
 import os
 from huggingface_hub import InferenceClient
@@ -13,6 +15,16 @@ app = FastAPI(title="Fraud Guard API")
 # ⚠️ REPLACE THIS WITH YOUR ACTUAL HUGGING FACE TOKEN
 # Ensure this token has "Inference" permissions!
 HF_TOKEN = os.getenv("HF_TOKEN")
+API_SECRET_KEY = os.getenv("API_KEY", "my_secret_password_123") 
+
+# 👇 DEFINE SECURITY SCHEME
+api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
+
+# 👇 SECURITY CHECK FUNCTION
+async def get_api_key(api_key_header: str = Security(api_key_header)):
+    if api_key_header != API_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Could not validate credentials")
+    return api_key_header
 
 # Setup Hugging Face Client (Llama 3 Instruct)
 repo_id = "meta-llama/Meta-Llama-3-8B-Instruct"
@@ -66,7 +78,8 @@ def generate_explanation(amount, old_bal, type_str):
 
 # --- 2. PREDICT ENDPOINT ---
 @app.post("/predict")
-def predict(txn: Transaction):
+# 👇 ADD THIS DEPENDENCY to lock the endpoint
+def predict(txn: Transaction, api_key: str = Depends(get_api_key)): 
     if not model:
         raise HTTPException(status_code=500, detail="Model not loaded")
 
