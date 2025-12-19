@@ -1,156 +1,149 @@
 import pandas as pd
 import mlflow.pyfunc
-from fastapi import FastAPI, HTTPException
-from fastapi import FastAPI, HTTPException, Security, Depends # 👈 Added Security imports
-from fastapi.security.api_key import APIKeyHeader # 👈 Added APIKeyHeader
+from fastapi import FastAPI, HTTPException, Security, Depends
+from fastapi.security.api_key import APIKeyHeader
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import os
-from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
+from huggingface_hub import InferenceClient
+
+# 1. Load Secrets
 load_dotenv()
-
-app = FastAPI(title="Fraud Guard API")
-
-# --- CONFIGURATION ---
-# ⚠️ REPLACE THIS WITH YOUR ACTUAL HUGGING FACE TOKEN
-# Ensure this token has "Inference" permissions!
 HF_TOKEN = os.getenv("HF_TOKEN")
-API_SECRET_KEY = os.getenv("API_KEY", "my_secret_password_123") 
+API_SECRET_KEY = os.getenv("API_KEY", "Sentinel_Secure_2025") # Must match Frontend
 
-# 👇 DEFINE SECURITY SCHEME
+# 2. Setup App & Security
+app = FastAPI(title="Sentinel: AI Fraud Intelligence Platform")
+
+# CORS (Allow Frontend to talk to Backend)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"], # In production, replace * with your specific Frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Security Scheme
 api_key_header = APIKeyHeader(name="x-api-key", auto_error=True)
 
-# 👇 SECURITY CHECK FUNCTION
 async def get_api_key(api_key_header: str = Security(api_key_header)):
     if api_key_header != API_SECRET_KEY:
-        raise HTTPException(status_code=403, detail="Could not validate credentials")
+        raise HTTPException(status_code=403, detail="⛔ Access Denied: Invalid API Key")
     return api_key_header
 
-# Setup Hugging Face Client (Llama 3 Instruct)
-repo_id = "meta-llama/Meta-Llama-3-8B-Instruct"
-llm_client = InferenceClient(model=repo_id, token=HF_TOKEN)
-
-MODEL_NAME = "FraudGuard"
-model = None
-
-# --- LOAD MODEL AT STARTUP ---
-@app.on_event("startup")
-def load_model():
-    global model
-    try:
-        model = mlflow.pyfunc.load_model("fraud_model")
-        print(f"✅ Model '{MODEL_NAME}' loaded successfully.")
-    except Exception as e:
-        print(f"❌ Error loading model: {e}")
-
-# --- 1. DEFINE DATA SCHEMA ---
+# 3. Define Data Structure (Matches PaySim Dataset)
 class Transaction(BaseModel):
-    type: str
+    type: str  # "CASH_OUT" or "TRANSFER"
     amount: float
     oldbalanceOrg: float
     newbalanceOrig: float
 
-# --- GENAI EXPLANATION FUNCTION ---
-def generate_explanation(amount, old_bal, type_str):
-    if not HF_TOKEN or "hf_" not in HF_TOKEN:
-        return "AI Explanation unavailable (Invalid HF Token)."
-    
-    messages = [
-        {
-            "role": "system", 
-            "content": "You are a fraud analyst. Explain why this transaction is suspicious in 1 short sentence."
-        },
-        {
-            "role": "user", 
-            "content": f"Transaction Details:\n- Type: {type_str}\n- Amount: ${amount}\n- Old Balance: ${old_bal}"
-        }
-    ]
+# 4. Global Model Variable
+model = None
+MODEL_PATH = "fraud_model" # Folder where we exported the model
 
+@app.on_event("startup")
+def load_model():
+    global model
     try:
-        response = llm_client.chat_completion(
-            messages=messages, 
-            max_tokens=100, 
-            temperature=0.5
-        )
-        return response.choices[0].message.content
+        print(f"📂 Loading model from '{MODEL_PATH}'...")
+        model = mlflow.pyfunc.load_model(MODEL_PATH)
+        print("✅ Model loaded successfully!")
     except Exception as e:
-        return f"AI Error: {str(e)}"
+        print(f"❌ Error loading model: {e}")
 
-# --- 2. PREDICT ENDPOINT ---
+# 5. GenAI Explanation Function (Llama 3)
+def explain_fraud(txn: Transaction, risk_score: str, rule_hit: str = None):
+    if not HF_TOKEN:
+        return "Explanation unavailable (HF_TOKEN missing)."
+    
+    client = InferenceClient(token=HF_TOKEN)
+    
+    # Prompt Engineering
+    prompt = f"""
+    You are a financial fraud investigator. Analyze this suspicious transaction:
+    - Type: {txn.type}
+    - Amount: ${txn.amount}
+    - Sender Old Balance: ${txn.oldbalanceOrg}
+    - Sender New Balance: ${txn.newbalanceOrig}
+    - Alert: {rule_hit if rule_hit else "ML Model detected anomaly"}
+    
+    Explain in 1 clear sentence why this is risky. Do not define terms. Focus on the math.
+    """
+    
+    try:
+        response = client.text_generation(
+            model="meta-llama/Meta-Llama-3-8B-Instruct",
+            prompt=prompt,
+            max_new_tokens=60,
+            temperature=0.7
+        )
+        return response.strip()
+    except Exception as e:
+        return f"AI Analysis failed: {str(e)}"
+
+# 6. The Secured Predict Endpoint
 @app.post("/predict")
-# 👇 ADD THIS DEPENDENCY to lock the endpoint
-def predict(txn: Transaction, api_key: str = Depends(get_api_key)): 
+def predict(txn: Transaction, api_key: str = Depends(get_api_key)):
+    global model
     if not model:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+        raise HTTPException(status_code=500, detail="Model is not loaded.")
 
-    # --- 🛡️ LAYER 1: HARD RULES (The Logic Check) ---
-    
-    # Rule 1: Overdraft Check
-    if txn.amount > txn.oldbalanceOrg:
-        return {
-            "is_fraud": 1, 
-            "risk_score": "CRITICAL", 
-            "explanation": f"HARD RULE VIOLATION: Attempted to transfer ${txn.amount} with only ${txn.oldbalanceOrg} in account."
-        }
-    
-    # Rule 2: Negative Numbers
-    if txn.amount < 0 or txn.oldbalanceOrg < 0:
-         return {
-            "is_fraud": 1, 
-            "risk_score": "CRITICAL", 
-            "explanation": "HARD RULE VIOLATION: Negative transaction values detected."
-        }
-
-    # Rule 3: The "Math Integrity" Check (Catches Magic Money Increases)
-    expected_balance = txn.oldbalanceOrg - txn.amount
-    # If New Balance is significantly higher than expected (allowing small buffer)
-    if txn.newbalanceOrig > (expected_balance + 2000): 
-         return {
-            "is_fraud": 1,
-            "risk_score": "CRITICAL",
-            "explanation": f"HARD RULE VIOLATION: Suspicious balance increase. Expected ~${expected_balance}, but got ${txn.newbalanceOrig}."
-        }
-    expected_balance = txn.oldbalanceOrg - txn.amount
-    math_error = abs(txn.newbalanceOrig - expected_balance) # Use Absolute Difference
-    
-    if math_error > 200: # If off by more than $200 in EITHER direction
-         return {
-            "is_fraud": 1,
-            "risk_score": "CRITICAL",
-            "explanation": f"HARD RULE VIOLATION: Balance mismatch. Expected ~${expected_balance}, but difference is ${math_error:.2f}."
-        }
-    # Rule 4: The "Account Drain" Policy
-    # Logic: If a transaction empties >90% of funds AND the amount is tiny (<$200) left, flag it.
-    if txn.oldbalanceOrg > 0:
-        draining_ratio = txn.amount / txn.oldbalanceOrg
-        if draining_ratio > 0.90 and txn.newbalanceOrig < 200:
+    # --- A. HARD RULES LAYER (Heuristics) ---
+    # Rule 1: Phantom Drain (Money disappears but wasn't sent)
+    if txn.amount > 0 and txn.oldbalanceOrg > 0 and txn.newbalanceOrig == 0:
+        if txn.amount != txn.oldbalanceOrg:
              return {
                 "is_fraud": 1,
                 "risk_score": "CRITICAL",
-                "explanation": f"HARD RULE VIOLATION: Possible Account Draining. User withdrew {draining_ratio*100:.1f}% of funds."
+                "explanation": "HARD RULE VIOLATION: Phantom Drain detected. Balance dropped to zero without matching transfer amount."
             }
-    # --- 🧠 LAYER 2: ML MODEL (The Pattern Check) ---
-    type_val = 0 if txn.type == "CASH_OUT" else 1
-    error_balance = txn.newbalanceOrig + txn.amount - txn.oldbalanceOrg
 
-    input_df = pd.DataFrame([{
-        "type": type_val,
-        "amount": txn.amount,
-        "oldbalanceOrg": txn.oldbalanceOrg,
-        "newbalanceOrig": txn.newbalanceOrig,
-        "errorBalanceOrg": error_balance
-    }])
+    # Rule 2: Magic Money (Balance increases after sending money)
+    if txn.newbalanceOrig > txn.oldbalanceOrg:
+         return {
+            "is_fraud": 1,
+            "risk_score": "CRITICAL",
+            "explanation": "HARD RULE VIOLATION: Magic Money. Sender balance increased after an outflow transaction."
+        }
 
-    # Predict
-    prediction = int(model.predict(input_df)[0])
-    
-    # Explain
-    explanation = "Transaction appears safe."
-    if prediction == 1:
-        explanation = generate_explanation(txn.amount, txn.oldbalanceOrg, txn.type)
+    # --- B. ML PREDICTION LAYER ---
+    try:
+        # 1. Preprocess Data (Must match Training Logic!)
+        input_data = pd.DataFrame([txn.dict()])
+        
+        # Calculate Error Balance (Feature Engineering)
+        input_data['errorBalanceOrg'] = input_data.newbalanceOrig + input_data.amount - input_data.oldbalanceOrg
+        
+        # Label Encode Type (CASH_OUT=0, TRANSFER=1) - Logic from your training script
+        type_map = {'CASH_OUT': 0, 'TRANSFER': 1, 'PAYMENT': 3, 'CASH_IN': 4, 'DEBIT': 5}
+        input_data['type'] = input_data['type'].map(type_map).fillna(0) # Default to 0 if unknown
+        
+        # Select Features expected by XGBoost
+        features = ['type', 'amount', 'oldbalanceOrg', 'newbalanceOrig', 'errorBalanceOrg']
+        input_data = input_data[features]
 
-    return {
-        "is_fraud": prediction,
-        "risk_score": "HIGH" if prediction == 1 else "LOW",
-        "explanation": explanation
-    }
+        # 2. Predict
+        prediction = model.predict(input_data)[0]
+        is_fraud = int(prediction)
+        
+        # 3. Generate Explanation
+        explanation = "Transaction appears normal."
+        if is_fraud:
+            explanation = explain_fraud(txn, "CRITICAL")
+            
+        return {
+            "is_fraud": is_fraud,
+            "risk_score": "CRITICAL" if is_fraud else "SAFE",
+            "explanation": explanation
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Prediction Error: {str(e)}")
+
+# 7. Health Check (For System Health Page)
+@app.get("/")
+def home():
+    return {"status": "online", "model_loaded": model is not None}

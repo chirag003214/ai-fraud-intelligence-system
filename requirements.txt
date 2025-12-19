@@ -11,3 +11,5 @@ huggingface_hub
 pydantic
 python-multipart
 python-dotenv
+evidently
+
