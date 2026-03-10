@@ -1,0 +1,13 @@
+fastapi
+uvicorn
+pydantic
+python-dotenv
+pandas
+numpy
+streamlit
+requests
+xgboost
+mlflow
+huggingface_hub
+scikit-learn
+watchdog
