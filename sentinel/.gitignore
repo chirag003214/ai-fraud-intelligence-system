@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Environment secrets
+.env
+
+# Data files (too large for git)
+data/
+*.csv
+
+# Model artifacts (binary, regenerate with `make train`)
+*.pkl
+mlflow.db
+mlruns/
+
+# Database files
+*.db
+!mlflow.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# Docker volumes
+postgres_data/

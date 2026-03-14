@@ -1,0 +1,68 @@
+warning: in the working copy of 'backend/main.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'fraud_model/requirements.txt', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/app.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'frontend/drift_monitor.py', LF will be replaced by CRLF the next time Git touches it
+interactive rebase in progress; onto 35fc7e3
+Last command done (1 command done):
+   pick 1f57c2a fix: security cleanup, correct README, improve repo hygiene- Remove mlruns/ from git tracking (contained local Windows paths)- Remove hardcoded API key default value- Add .env.example- Rewrite README to match actual project (fraud detection, not research agent)- Add data/ and *.pkl to .gitignore
+No commands remaining.
+You are currently rebasing branch 'main' on '35fc7e3'.
+  (fix conflicts and then run "git rebase --continue")
+  (use "git rebase --skip" to skip this patch)
+  (use "git rebase --abort" to check out the original branch)
+
+Changes to be committed:
+  (use "git restore --staged <file>..." to unstage)
+	new file:   .env.example
+	new file:   backend/_init_.py
+	new file:   backend/config.py
+	new file:   backend/database.py
+	new file:   backend/models/_init.py
+	new file:   backend/rebuild_model.py
+	new file:   backend/requirements.txt
+	new file:   backend/routers/_init_.py
+	new file:   backend/routers/explain.py
+	new file:   backend/routers/predict.py
+	new file:   backend/schemas/_init_.py
+	new file:   backend/schemas/schemas.py
+	new file:   backend/services/model_loader.py
+	new file:   backend/utils/_init_.py
+	new file:   backend/utils/shap_utils.py
+	new file:   frontend/requirements.txt
+	modified:   frontend/system_health.py
+	new file:   rebuild_model.py
+	new file:   sentinel_history.db
+	new file:   training_mlflow_.ipynb
+
+Unmerged paths:
+  (use "git restore --staged <file>..." to unstage)
+  (use "git add <file>..." to mark resolution)
+	both added:      .gitignore
+	both added:      README.md
+	both added:      backend/main.py
+	both added:      fraud_model/MLmodel
+	both added:      fraud_model/conda.yaml
+	both added:      fraud_model/requirements.txt
+	both added:      frontend/app.py
+	both added:      frontend/drift_monitor.py
+	both added:      mlflow.db
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	deleted:    fraud_model/model.pkl
+	modified:   fraud_model/python_env.yaml
+	modified:   frontend/system_health.py
+	modified:   sentinel_history.db
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.venv/
+	.vscode/
+	fraud_model/model.ubj
+	pip_freeze.txt
+	sentinel/
+	status.txt
+	status2.txt
+	version.txt
+

@@ -1,0 +1,24 @@
+On branch main
+Your branch and 'origin/main' have diverged,
+and have 10 and 1 different commits each, respectively.
+  (use "git pull" if you want to integrate the remote branch with yours)
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	.vscode/
+	conflicts.txt
+	diff_readme.txt
+	fraud_model/model.ubj
+	pip_freeze.txt
+	rebase.txt
+	rebase2.txt
+	rebase3.txt
+	sentinel/
+	status.txt
+	status2.txt
+	status3.txt
+	status4.txt
+	unmerged.txt
+	version.txt
+
+nothing added to commit but untracked files present (use "git add" to track)

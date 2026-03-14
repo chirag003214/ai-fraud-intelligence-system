@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "C:\\Users\\Chirag Sharma\\Desktop\\ai-fraud-intelligent-system\\.venv\\Scripts\\python.exe",
+  "python.analysis.typeCheckingMode": "off",
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}",
+    "${workspaceFolder}/frontend",
+    "${workspaceFolder}/backend",
+    "${workspaceFolder}/sentinel",
+    "${workspaceFolder}/.venv/Lib/site-packages"
+  ]
+}
