@@ -1,9 +1,0 @@
-.gitignore
-README.md
-backend/main.py
-fraud_model/MLmodel
-fraud_model/conda.yaml
-fraud_model/requirements.txt
-frontend/app.py
-frontend/drift_monitor.py
-mlflow.db
