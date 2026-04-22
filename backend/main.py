@@ -1,10 +1,12 @@
+import os
+import numpy as np
 import pandas as pd
 import mlflow.pyfunc
+import mlflow.sklearn
 from fastapi import FastAPI, HTTPException, Security, Depends
 from fastapi.security.api_key import APIKeyHeader
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import os
 from dotenv import load_dotenv
 from huggingface_hub import InferenceClient
 
@@ -50,10 +52,55 @@ class Transaction(BaseModel):
 model = None
 MODEL_PATH = "fraud_model"
 
+
+def _rebuild_model():
+    """Generate synthetic PaySim-style data and train a fallback XGBoost model."""
+    from xgboost import XGBClassifier
+
+    rng = np.random.default_rng(42)
+    n = 50_000
+
+    txn_type = rng.integers(0, 5, size=n)
+    amount = rng.exponential(scale=15_000, size=n)
+    old_bal = rng.exponential(scale=20_000, size=n)
+    # Fraudulent transactions typically drain the account
+    is_fraud = (
+        (txn_type == 0) & (amount > 10_000) & (old_bal - amount < 100)
+    ).astype(int)
+    new_bal = np.where(is_fraud, np.maximum(old_bal - amount, 0), old_bal - amount * rng.uniform(0, 0.5, n))
+    error_bal = new_bal + amount - old_bal
+
+    X = pd.DataFrame({
+        "type": txn_type,
+        "amount": amount,
+        "oldbalanceOrg": old_bal,
+        "newbalanceOrig": new_bal,
+        "errorBalanceOrg": error_bal,
+    })
+    y = is_fraud
+
+    clf = XGBClassifier(
+        n_estimators=100,
+        max_depth=6,
+        learning_rate=0.1,
+        scale_pos_weight=int((y == 0).sum() / max((y == 1).sum(), 1)),
+        use_label_encoder=False,
+        eval_metric="logloss",
+        random_state=42,
+    )
+    clf.fit(X, y)
+
+    mlflow.sklearn.save_model(clf, MODEL_PATH)
+    print(f"✅ Fallback model built and saved to '{MODEL_PATH}'")
+
+
 @app.on_event("startup")
 def startup_event():
     global model
     try:
+        if not os.path.exists(MODEL_PATH):
+            print(f"⚠️  '{MODEL_PATH}' not found — rebuilding from synthetic data...")
+            _rebuild_model()
         # Load ML Model
         model = mlflow.pyfunc.load_model(MODEL_PATH)
         # Initialize Database
