@@ -56,6 +56,10 @@ uvicorn backend.main:app --reload --port 8000
 streamlit run frontend/app.py
 ```
 
+`backend/main.py` auto-rebuilds the `fraud_model/` artifact on startup when it's missing (synthetic PaySim-shaped data, see `_rebuild_model` in `backend/main.py`). To regenerate it manually run `python rebuild_model.py` from the repo root. There is no `export_model.py` script — MLflow artifact export happens inside `sentinel/ml/train.py`.
+
+Render / single-container deploy uses the root `Dockerfile` (Python 3.10, copies `sentinel/` into `/app/`, installs `frontend/requirements.txt`, runs `python frontend/app.py`).
+
 ## Architecture
 
 ### Request Flow
@@ -132,6 +136,7 @@ ai-fraud-intelligent-system/
     │   └── tasks/
     │       ├── shap_task.py       # Async SHAP TreeExplainer → top 5 features
     │       ├── llm_task.py        # Async Llama 3-8B narrative (max 60 tokens)
+    │       ├── batch_task.py      # Async batch-prediction worker for /v1/predict/batch
     │       └── retrain_task.py    # Drift-triggered retraining (Celery Beat, 24h)
     ├── tests/
     │   ├── unit/                  # Pure Python — no HTTP, no DB
@@ -139,7 +144,10 @@ ai-fraud-intelligent-system/
     ├── frontend/
     │   ├── app.py                 # Main Streamlit dashboard
     │   └── pages/                 # fraud_scanner, live_feed, drift_monitor, history, system_health
-    ├── docs/decisions/            # ADRs: rules-before-ml, shap-vs-lime, cost-threshold, llm-explainer
+    ├── docs/
+    │   ├── API.md                 # REST + WS endpoint reference
+    │   ├── ARCHITECTURE.md        # Detailed system architecture
+    │   └── decisions/             # ADRs: rules-before-ml, shap-vs-lime, cost-threshold, llm-explainer
     ├── docker/
     │   ├── Dockerfile.backend     # Multi-stage Python 3.11-slim
     │   ├── Dockerfile.frontend
@@ -171,7 +179,7 @@ Sentinel service (`sentinel/.env`):
 - **Training data:** PaySim synthetic dataset (CSV) placed in `data/` — not in git. Only `CASH_OUT` and `TRANSFER` transactions are used.
 - **Features (8):** `type` (encoded), `amount`, `oldbalanceOrg`, `newbalanceOrig`, `errorBalanceOrg`, `amount_to_balance_ratio`, `is_zero_balance_after`, `is_round_amount`.
 - **Class imbalance:** handled with `scale_pos_weight=99`.
-- **`fraud_model/` artifact** is not committed to git — rebuild with `make train` or `python model_rebuild.py` (root).
+- **`fraud_model/` artifact** is not committed to git — rebuild with `make train` (sentinel) or `python rebuild_model.py` (root). The root `backend/main.py` also auto-rebuilds it on startup if missing.
 - **A/B testing:** Champion required; challenger optional (set `CHALLENGER_MODEL_PATH` env var). Routing is deterministic per `customer_id` via MD5 hash.
 - **Reference data** for drift monitoring is saved during training to `ml/reference_data.csv`.
 

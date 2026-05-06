@@ -18,7 +18,7 @@ Get a JWT by exchanging your API key:
 ```bash
 curl -X POST http://localhost:8000/v1/auth/token \
   -H "Content-Type: application/json" \
-  -d '{"api_key": "your-api-key"}'
+  -d '{"api_key": "<your-API_KEY-from-.env>"}'
 ```
 
 ---

@@ -200,20 +200,30 @@ make typecheck     # Mypy strict mode
 
 ---
 
-## 📈 Dataset
+## 📈 Dataset & Model Artifact
 
-Trained on the [PaySim synthetic financial dataset](https://www.kaggle.com/datasets/ealaxi/paysim1).
-Place the CSV in `data/` and run `make train` to rebuild the model.
+Trained on the [PaySim synthetic financial dataset](https://www.kaggle.com/datasets/ealaxi/paysim1) (Kaggle). The training pipeline lives in `ml/train.py` and uses only `CASH_OUT` and `TRANSFER` rows with `scale_pos_weight=99` to handle class imbalance.
+
+The `fraud_model/` artifact is **not committed to git** — rebuild it from the PaySim CSV:
+
+```bash
+# 1. Download PS_20174392719_1491204439457_log.csv from the Kaggle link above
+# 2. Place it under data/ at the repo root
+# 3. From sentinel/:
+make train
+```
+
+`make train` runs `ml/train.py`, logs the run to MLflow, and writes the artifact to `fraud_model/` plus reference data to `ml/reference_data.csv` (used by the PSI drift monitor).
 
 ---
 
 ## 🛡️ Security
 
-- JWT + API key dual authentication
-- Rate limiting (60 req/min on predict)
-- CORS restricted to configured origins
-- No secrets in code — all env vars
-- Request ID injection for audit trails
+- JWT + API key dual authentication (`POST /v1/auth/token` exchanges an API key for a Bearer JWT — see `src/core/security.py`)
+- CORS restricted to the `CORS_ORIGINS` list configured in `.env`
+- No secrets in code — all env vars loaded via `pydantic-settings`
+- Request ID injection on every request for audit trails (see `src/api/middleware.py`)
+- `slowapi` is wired as a dependency for future per-route rate limiting; limiter middleware is not yet enabled.
 
 ---
 

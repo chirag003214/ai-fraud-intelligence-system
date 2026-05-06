@@ -1,3 +1,20 @@
+"""
+Dev-only fallback trainer for `fraud_model/`.
+
+This script trains an XGBoost classifier on a tiny hand-coded synthetic stub
+(1,000 rows of repeating values) and writes the artifact in MLflow format so
+the API can boot without the PaySim dataset present. **It is not the real
+training pipeline and the resulting model has no fraud-detection value.**
+
+For an actual model trained on the PaySim financial dataset with MLflow run
+tracking, class-imbalance handling (`scale_pos_weight=99`), and reference
+data export for drift monitoring, use:
+
+    cd sentinel && make train     # runs sentinel/ml/train.py
+
+Download PaySim from: https://www.kaggle.com/datasets/ealaxi/paysim1
+"""
+
 import pandas as pd
 import xgboost as xgb
 import mlflow
